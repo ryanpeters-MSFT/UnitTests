@@ -9,15 +9,15 @@ namespace UnitTests.Data
     public class EntityFrameworkClientRepository : IClientRepository
     {
         // mock a list of Client objects
-        private static ICollection<Client> clients = new List<Client>
+        private static readonly ICollection<Client> clients = new List<Client>
         {
-            new Client
+            new() 
             {
                 Id = Guid.NewGuid(),
                 Name = "John Doe",
                 DateOfBirth = new DateTime(1980, 1, 1)
             },
-            new Client
+            new()
             {
                 Id = Guid.NewGuid(),
                 Name = "Jane Doe",
@@ -25,9 +25,23 @@ namespace UnitTests.Data
             }
         };
 
-        public ICollection<Client> GetClients()
+        public Client GetClient(Guid id)
         {
-            return clients;
+            return clients.FirstOrDefault(c => c.Id == id);
+        }
+
+        public ICollection<Client> GetClients() => clients;
+
+        public void SaveClient(Client client)
+        {
+            var existingClient = clients.FirstOrDefault(c => c.Id == client.Id);
+
+            if (existingClient != null)
+            {
+                existingClient.Name = client.Name;
+                existingClient.IsVip = client.IsVip;
+                existingClient.DateOfBirth = client.DateOfBirth;
+            }
         }
     }
 }

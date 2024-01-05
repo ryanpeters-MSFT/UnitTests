@@ -9,64 +9,79 @@ namespace UnitTests.Tests
 {
     public class ClientTests
     {
-        private readonly ServiceCollection _commonServices;
-
-        public ClientTests()
-        {
-            _commonServices = new ServiceCollection();
-
-            // common services across all tests
-            _commonServices.AddTransient<ClientService>();
-            _commonServices.AddSingleton(typeof(ILogger<>), typeof(MockLogger<>));
-        }
-
         [Fact]
-        public void GetEligibleClients()
+        public void SetClientVipIfEligible()
         {
-            // configure test-specific services using Moq
-            void services(ServiceCollection services)
-            {
-                // initialize the mock repo
-                var clientRepositoryMock = new Mock<IClientRepository>();
+            var containerFactory = new MockContainerFactory();
+            var clientRepositoryMock = new Mock<IClientRepository>();
+            var orderRepositoryMock = new Mock<IOrderRepository>();
 
-                // setup/mock the GetClients method to apply to our specific test
-                clientRepositoryMock.Setup(r => r.GetClients()).Returns(new List<Client>
+            var clientId = Guid.NewGuid();
+
+            // setup/mock the GetClients method to apply to our specific test
+            clientRepositoryMock
+                .Setup(r => r.GetClient(clientId))
+                .Returns(new Client
                 {
-                    new Client { Id = Guid.NewGuid(), Name = "Moq Client", DateOfBirth = DateTime.Parse("11/20/1983") }, // over 18
-                    new Client { Id = Guid.NewGuid(), Name = "Minor Client", DateOfBirth = DateTime.Parse("4/13/2010") } // under 18
+                    Id = clientId,
+                    Name = "John Doe",
+                    DateOfBirth = DateTime.Parse("11/20/1983"),
+                    IsVip = false
                 });
 
-                // add the mocked service to the collection
-                services.AddTransient(s => clientRepositoryMock.Object);
-            }
+            orderRepositoryMock
+                .Setup(r => r.GetOrders(clientId))
+                .Returns(new Order[]
+                {
+                    new()
+                    {
+                        Id = Guid.NewGuid(),
+                        ClientId = clientId,
+                        Created = DateTime.Now.AddDays(-4),
+                        TotalCost = 130
+                    },
+                    new()
+                    {
+                        Id = Guid.NewGuid(),
+                        ClientId = clientId,
+                        Created = DateTime.Now.AddDays(-30),
+                        TotalCost = 80
+                    },
+                    new()
+                    {
+                        Id = Guid.NewGuid(),
+                        ClientId = clientId,
+                        Created = DateTime.Now.AddMonths(-2),
+                        TotalCost = 30
+                    }
+                });
 
-            Invoke(services, serviceProvider =>
+            // add the default and test-specific mocked services to the collection
+            containerFactory
+                .ConfigureServices(DefaultServices)
+                .ConfigureServices(services =>
+                {
+                    services.AddTransient(s => clientRepositoryMock.Object);
+                    services.AddTransient(s => orderRepositoryMock.Object);
+                });
+
+            containerFactory.Invoke(serviceProvider =>
             {
                 var clientService = serviceProvider.GetService<ClientService>();
 
-                var clients = clientService.GetEligibleClients();
+                clientService.UpdateVipStatus(clientId);
 
-                Assert.NotEmpty(clients);
-                Assert.Equal(1, clients.Count);
+                var client = clientService.GetClient(clientId);
+
+                Assert.True(client.IsVip);
             });
         }
 
-        #region Move to base class
-
-        private void Invoke(Action<ServiceCollection> services, Action<ServiceProvider> action)
+        private void DefaultServices(ServiceCollection serviceCollection)
         {
-            services.Invoke(_commonServices);
-
-            Invoke(action);
+            // common services across all tests
+            serviceCollection.AddTransient<ClientService>();
+            serviceCollection.AddSingleton(typeof(ILogger<>), typeof(MockLogger<>));
         }
-
-        private void Invoke(Action<ServiceProvider> action)
-        {
-            var serviceProvider = _commonServices.BuildServiceProvider();
-
-            action.Invoke(serviceProvider);
-        }
-
-        #endregion
     }
 }

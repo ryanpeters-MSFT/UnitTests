@@ -7,36 +7,51 @@ namespace UnitTests.Services
     public class ClientService
     {
         private readonly ILogger<ClientService> _logger;
+        private readonly IOrderRepository _orderRepository;
         private readonly IClientRepository _clientRepository;
 
-        public ClientService(ILogger<ClientService> logger, IClientRepository clientRepository)
+        public ClientService(ILogger<ClientService> logger, IOrderRepository orderRepository, IClientRepository clientRepository)
         {
             _logger = logger;
+            _orderRepository = orderRepository;
             _clientRepository = clientRepository;
         }
 
-        public ICollection<Client> GetClients()
+        public ICollection<Client> GetClients() => _clientRepository.GetClients();
+        public Client GetClient(Guid id) => _clientRepository.GetClient(id);
+
+        /// <summary>
+        /// Set a client to VIP status if they purchased >=$200 in the past month
+        /// </summary>
+        /// <param name="clientId"></param>
+        public void UpdateVipStatus(Guid clientId)
         {
-            _logger.LogInformation("Getting clients");
+            _logger.LogInformation($"Updating client VIP with ID {clientId}");
 
-            var clients = _clientRepository.GetClients();
+            try
+            {
+                var orders = _orderRepository.GetOrders(clientId);
 
-            _logger.LogInformation("Got {Count} clients", clients.Count);
+                var lastMonth = DateTime.Now.AddMonths(-1).Date;
+                var eligibleOrdersTotal = orders.Where(o => o.Created > lastMonth).Sum(o => o.TotalCost);
 
-            return clients;
-        }
+                _logger.LogInformation($"Client ID {clientId} has ${eligibleOrdersTotal} total orders");
 
-        public ICollection<Client> GetEligibleClients()
-        {
-            _logger.LogInformation("Getting clients over the age of 18");
-            
-            DateTime date = DateTime.Now.Date;
+                if (eligibleOrdersTotal >= 200)
+                {
+                    var client = _clientRepository.GetClient(clientId);
 
-            var clients = _clientRepository.GetClients().Where(c => c.DateOfBirth.Year <= date.Year - 18).ToList();
+                    client.IsVip = true;
 
-            _logger.LogInformation("Got {Count} eligible clients", clients.Count);
+                    _clientRepository.SaveClient(client);
 
-            return clients;
+                    _logger.LogInformation($"Saved client with ID {clientId}");
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, $"Failed to update client VIP with ID {clientId}");
+            }
         }
     }
 }
