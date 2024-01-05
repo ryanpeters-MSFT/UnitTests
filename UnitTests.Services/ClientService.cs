@@ -33,13 +33,15 @@ namespace UnitTests.Services
 
             try
             {
-                var orders = _orderRepository.GetOrders(clientId);
-
                 var purchaseMonths = Convert.ToInt32(_configuration["purchaseMonths"]);
                 var minEligiblePurchase = Convert.ToDecimal(_configuration["minEligiblePurchase"]);
 
                 var lastMonth = DateTime.Now.AddMonths(purchaseMonths * -1).Date;
-                var eligibleOrdersTotal = orders.Where(o => o.Created >= lastMonth).Sum(o => o.TotalCost);
+
+                var eligibleOrdersTotal = _orderRepository
+                    .GetOrders(clientId)
+                    .Where(o => o.Created >= lastMonth)
+                    .Sum(o => o.TotalCost);
 
                 _logger.LogInformation($"Client ID {clientId} has ${eligibleOrdersTotal} total orders");
 
