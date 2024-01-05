@@ -33,7 +33,7 @@ namespace UnitTests.Services
                 var orders = _orderRepository.GetOrders(clientId);
 
                 var lastMonth = DateTime.Now.AddMonths(-1).Date;
-                var eligibleOrdersTotal = orders.Where(o => o.Created > lastMonth).Sum(o => o.TotalCost);
+                var eligibleOrdersTotal = orders.Where(o => o.Created >= lastMonth).Sum(o => o.TotalCost);
 
                 _logger.LogInformation($"Client ID {clientId} has ${eligibleOrdersTotal} total orders");
 
