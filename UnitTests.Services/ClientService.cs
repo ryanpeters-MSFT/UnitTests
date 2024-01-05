@@ -1,4 +1,5 @@
-﻿using Microsoft.Extensions.Logging;
+﻿using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging;
 using UnitTests.Common;
 using UnitTests.Common.Repositories;
 
@@ -9,12 +10,14 @@ namespace UnitTests.Services
         private readonly ILogger<ClientService> _logger;
         private readonly IOrderRepository _orderRepository;
         private readonly IClientRepository _clientRepository;
+        private readonly IConfiguration _configuration;
 
-        public ClientService(ILogger<ClientService> logger, IOrderRepository orderRepository, IClientRepository clientRepository)
+        public ClientService(ILogger<ClientService> logger, IOrderRepository orderRepository, IClientRepository clientRepository, IConfiguration configuration)
         {
             _logger = logger;
             _orderRepository = orderRepository;
             _clientRepository = clientRepository;
+            _configuration = configuration;
         }
 
         public ICollection<Client> GetClients() => _clientRepository.GetClients();
@@ -32,12 +35,15 @@ namespace UnitTests.Services
             {
                 var orders = _orderRepository.GetOrders(clientId);
 
-                var lastMonth = DateTime.Now.AddMonths(-1).Date;
+                var purchaseMonths = Convert.ToInt32(_configuration["purchaseMonths"]);
+                var minEligiblePurchase = Convert.ToDecimal(_configuration["minEligiblePurchase"]);
+
+                var lastMonth = DateTime.Now.AddMonths(purchaseMonths * -1).Date;
                 var eligibleOrdersTotal = orders.Where(o => o.Created >= lastMonth).Sum(o => o.TotalCost);
 
                 _logger.LogInformation($"Client ID {clientId} has ${eligibleOrdersTotal} total orders");
 
-                if (eligibleOrdersTotal >= 200)
+                if (eligibleOrdersTotal >= minEligiblePurchase)
                 {
                     var client = _clientRepository.GetClient(clientId);
 

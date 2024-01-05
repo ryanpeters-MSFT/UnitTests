@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Moq;
@@ -79,8 +80,19 @@ namespace UnitTests.Tests
 
         private void DefaultServices(ServiceCollection serviceCollection)
         {
+            var configurationData = new Dictionary<string, string?>
+            {
+                ["minEligiblePurchase"] = "200",
+                ["purchaseMonths"] = "1"
+            };
+
+            var config = new ConfigurationBuilder()
+                .AddInMemoryCollection(configurationData)
+                .Build();
+
             // common services across all tests
             serviceCollection.AddTransient<ClientService>();
+            serviceCollection.AddTransient<IConfiguration>(s => config);
             serviceCollection.AddSingleton(typeof(ILogger<>), typeof(MockLogger<>));
         }
     }
